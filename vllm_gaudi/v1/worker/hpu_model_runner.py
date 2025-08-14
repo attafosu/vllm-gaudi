@@ -1210,26 +1210,28 @@ class HPUModelRunner:
 
     def _align_and_pad_mrope_positions(self, req_ids : List[str], context_lens : List[int], query_lens : List[int], 
                                     bucketing : Tuple[int, int], padding_gen : int) -> torch.Tensor:
-        mrope_input_positions : List[List[int]] = [[] for _ in range(3)]
+        
         bs = len(context_lens)
         target_bs, target_len = bucketing
-        input_mrope_positions : List[List[List[int]]] = [[] for _ in range(3)]
+        mrope_input_positions : List[torch.Tensor] = [None] * bs
+        for b_idx, req_id in enumerate(req_ids):
+            #input_mrope_position = self.requests[req_id].mrope_positions[idx].tolist()
+            context_len = context_lens[b_idx]
+            query_len = query_lens[b_idx]
+            padding_size = target_len - query_len
+            padded_positions = F.pad(self.requests[req_id].mrope_positions[:, context_len:context_len + query_len],
+                                        (0, padding_size), value=padding_gen, mode='constant')
+            mrope_input_positions[b_idx] = padded_positions
 
-        for idx in range(3):
-            for b_idx, req_id in enumerate(req_ids):
-                input_mrope_position = self.requests[req_id].mrope_positions[idx].tolist()
-                context_len = context_lens[b_idx]
-                query_len = query_lens[b_idx]
-                padding_size = target_len - query_len
-                padded_positions = input_mrope_position[context_len:context_len + query_len] \
-                    + padding_size * [padding_gen]
-                mrope_input_positions[idx].extend(padded_positions)
+        # If padding in batch dim, we should add dummy ("padding_gen") mrope_pos_ids for each of the extra (bs_bucket - actual_bs) reqs,
+        # with their seqlens=target_len
+        if target_bs > bs:
+            mrope_input_positions[-1] = F.pad(mrope_input_positions[-1], (0, (target_bs - bs) * target_len), value=padding_gen, mode='constant')
+        if len(mrope_input_positions) == 1:
+            return mrope_input_positions[0].to(self.device, non_blocking=True)
 
-            # If padding in batch dim, we should add dummy ("padding_gen") mrope_pos_ids for each of the extra (bs_bucket - actual_bs) reqs,
-            # with their seqlens=target_len
-            if target_bs > bs:
-                mrope_input_positions[idx].extend([padding_gen] * (target_bs - bs) * target_len)
-        return torch.tensor(mrope_input_positions, dtype=torch.long, device='cpu').to('hpu', non_blocking=True)
+        output = torch.cat(mrope_input_positions, dim=1).to(self.device, non_blocking=True)
+        return output
 
     def _bucketize_merged_prompt(self, seq_lens, num_blocks):
         seq = sum(seq_lens)
@@ -1531,7 +1533,7 @@ class HPUModelRunner:
             input_mrope_positions = torch.tensor(
                 input_mrope_positions,
                 dtype=torch.long,
-                device='cpu').to('hpu', non_blocking=True)
+                device='cpu').to(self.device, non_blocking=True)
 
             # Pad the right side of input_mrope_positions by padded_batch_size
             pad_size = padded_batch_size - input_mrope_positions.size(1)
