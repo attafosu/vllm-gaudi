@@ -34,10 +34,9 @@ from vllm.model_executor.layers.sampler import get_sampler
 from vllm.model_executor.layers.vocab_parallel_embedding import (
     VocabParallelEmbedding)
 from vllm.model_executor.model_loader import get_model, get_model_loader
-from vllm.model_executor.models import supports_multimodal
 from vllm.multimodal import MULTIMODAL_REGISTRY
 from vllm.multimodal.inputs import (BatchedTensorInputs, MultiModalKwargs,
-                                MultiModalKwargsItem, PlaceholderRange)
+                                    MultiModalKwargsItem)
 from vllm.multimodal.utils import group_mm_kwargs_by_modality
 from vllm.model_executor.layers.rotary_embedding import MRotaryEmbedding
 from vllm.multimodal.inputs import PlaceholderRange
@@ -60,8 +59,9 @@ from vllm.model_executor.models.interfaces import supports_transcription
 from vllm.model_executor.models.interfaces_base import (
     is_pooling_model, is_text_generation_model)
 from vllm.tasks import GenerationTask, PoolingTask, SupportedTask
-from vllm.v1.worker.utils import (gather_mm_placeholders, 
-                    sanity_check_mm_encoder_outputs, scatter_mm_placeholders)
+from vllm.v1.worker.utils import (gather_mm_placeholders,
+                                  sanity_check_mm_encoder_outputs,
+                                  scatter_mm_placeholders)
 from vllm.v1.sample.logits_processor import build_logitsprocs
 
 if TYPE_CHECKING:
@@ -1013,7 +1013,7 @@ class HPUModelRunner:
         # TODO (attafosu): Follow-up on the resolution to this.
         # The ordering of the encoder outputs needs to match the request ids
         # after fetching the embeddings.
-        # For now, we'll restrict mm support to just a single prefill at a time -
+        # For now, we'll restrict mm support to just a single prefill at a time - # noqa E501
         # Or that requests in the batch should have distinct modalities,
 
         # FIXME(ywang96): This is a hacky way to deal with multiple modalities
@@ -1045,7 +1045,7 @@ class HPUModelRunner:
                 encoder_outputs.append(output)
 
         # FIXME (attafosu) Reorder the encoder outputs to match the request ids.
-        # This will be necessary after mm prefill batching constraints are removed
+        # This will be necessary after mm prefill batching constraints are removed # noqa E501
 
         # Cache the encoder outputs.
         for (req_id, input_id, pos_info), output in zip(
@@ -1251,20 +1251,20 @@ class HPUModelRunner:
         data = pad_list(data, target_bs, itertools.repeat(padding))
         return data
 
-    def _align_and_pad_mrope_positions(self, req_ids : list[str], 
-                                        context_lens : list[int],
-                                        query_lens : list[int],
-                                        bucketing : tuple[int, int],
-                                        padding_gen : int ) -> torch.Tensor:
-        bs = len(context_lens)
+    def _align_and_pad_mrope_positions(self,
+                                       req_ids: list[str],
+                                       context_lens: list[int],
+                                       query_lens: list[int],
+                                       bucketing: tuple[int, int],
+                                       padding_gen: int) -> torch.Tensor:
         target_bs, target_len = bucketing
         out_shape = (3, target_len) if target_bs == 1 \
-                    else (target_bs, target_len)
-        
+            else (target_bs, target_len)
+
         mrope_position_tensor = torch.full(
-                                    out_shape, 
-                                    padding_gen, 
-                                    dtype=torch.int32, 
+                                    out_shape,
+                                    padding_gen,
+                                    dtype=torch.int32,
                                     device='hpu')
         dst_start = 0
         dst_end = dst_start
@@ -1272,10 +1272,10 @@ class HPUModelRunner:
             cl = context_lens[b_idx]
             qsl = query_lens[b_idx]
             input_mrope_position = \
-                    self.requests[req_id].mrope_positions[:,cl:cl+qsl]
+                self.requests[req_id].mrope_positions[:, cl:cl+qsl]
             dst_end = dst_start + qsl
-            mrope_position_tensor[:,dst_start:dst_end].copy_(
-                                            input_mrope_position, 
+            mrope_position_tensor[:, dst_start:dst_end].copy_(
+                                            input_mrope_position,
                                             non_blocking=True)
 
             # Update dst_start depending on if pos_ids of requests are meant to be adjacent # noqa 501
@@ -1427,7 +1427,7 @@ class HPUModelRunner:
         has_context = sum(context_lens) > 0
         target_bs, target_seq, target_blocks = self._get_prompt_bucketing_fn()(
             query_lens, num_context_blocks)
-        
+
         # If the model uses M-RoPE, we need to fill
         # and pad the M-RoPE positions for the scheduled prefill tokens
         if self.uses_mrope:
@@ -1440,8 +1440,8 @@ class HPUModelRunner:
             )
 
         # NOTE: If model does not support multimodal inputs, we pad here.
-        # For models with multimodal support, we may want to get embeddings 
-        # for the valid tokens before padding. 
+        # For models with multimodal support, we may want to get embeddings
+        # for the valid tokens before padding.
         # This would require getting multimodal input embeddings here as well
         token_ids = self._align_and_pad(contents.token_ids,
                                         (target_bs, target_seq),
@@ -1450,8 +1450,8 @@ class HPUModelRunner:
             token_positions = mrope_token_positions
         else:
             token_positions = self._align_and_pad(token_positions,
-                                                (target_bs, target_seq),
-                                                itertools.repeat(-1))
+                                                  (target_bs, target_seq),
+                                                  itertools.repeat(-1))
         token_slots = self._align_and_pad(token_slots, (target_bs, target_seq),
                                           itertools.repeat(-1))
         token_groups = self._align_and_pad(token_groups,
@@ -1579,9 +1579,9 @@ class HPUModelRunner:
         padded_index = torch.zeros((padded_batch_size, 1), dtype=torch.int64)
         index = positions.to(torch.int64)[:num_decodes]
         padded_index[:num_decodes] = index
-        
+
         input_mrope_positions: list[list[int]] = [[] for _ in range(3)]
-        if self.uses_mrope:        
+        if self.uses_mrope:
             for idx, req_id in enumerate(
                     self.input_batch.req_ids[:num_decodes]):
                 seq_data = self.requests[req_id]
@@ -1597,7 +1597,7 @@ class HPUModelRunner:
                     pos_for_mrope = [[position]] * 3
                 for idx in range(3):
                     input_mrope_positions[idx].extend(pos_for_mrope[idx])
-            
+
             input_mrope_positions = torch.tensor(
                 input_mrope_positions,
                 dtype=torch.int32,
@@ -1606,9 +1606,10 @@ class HPUModelRunner:
             # Pad the right side of input_mrope_positions by padded_batch_size
             pad_size = padded_batch_size - input_mrope_positions.size(1) # noqa
             if pad_size > 0:
-                input_mrope_positions = F.pad(input_mrope_positions, 
-                                        (0, pad_size), 
-                                        value=-1, mode='constant')
+                input_mrope_positions = F.pad(input_mrope_positions,
+                                              (0, pad_size),
+                                              value=-1,
+                                              mode='constant')
 
         # TOKEN_IDS. [batch, 1]
         token_ids = torch.zeros((padded_batch_size, 1), dtype=torch.int32)
@@ -1658,7 +1659,7 @@ class HPUModelRunner:
         # CPU<>HPU sync *should not* happen here.
         token_ids_device = _async_h2d_tensor_copy(token_ids, self.device)
         positions_device = input_mrope_positions if self.uses_mrope \
-                        else _async_h2d_tensor_copy(positions, self.device)
+            else _async_h2d_tensor_copy(positions, self.device)
         logits_indices_device = _async_h2d_tensor_copy(logits_indices,
                                                        self.device)
         block_list_device = _async_h2d_tensor_copy(block_list, self.device)
@@ -2037,16 +2038,19 @@ class HPUModelRunner:
                       logits_requests) in enumerate(
                           zip(*shallow_tuple(prefill_data))):
 
-                inputs_embeds=None
+                inputs_embeds = None
                 model_mm_kwargs = None
                 if self.supports_mm_inputs:
                     # Run the multimodal encoder if any.
-                    with self.profiler.record_event('internal', 'prepare_input_encoders'):
+                    with self.profiler.record_event('internal',
+                                                    'prepare_input_encoders'
+                                                    ):
                         self._execute_mm_encoder(scheduler_output, req_id)
 
-                    mm_embeds = self._gather_mm_embeddings(scheduler_output, req_id)
-                    #TODO: Only get embeddings for valid token_ids. Ignore token_ids[<pad_idxs>]
-                    # This may require moving multimodal input preps into _prepare_inputs,
+                    mm_embeds = self._gather_mm_embeddings(
+                        scheduler_output, req_id)
+                    # TODO: Only get embeddings for valid token_ids. Ignore token_ids[<pad_idxs>] # noqa E501
+                    # This may require moving multimodal input preps into _prepare_inputs,        # noqa E501
                     # to avoid padding issues.
                     inputs_embeds = self.model.get_input_embeddings(
                         input_ids=token_ids,
@@ -2074,7 +2078,7 @@ class HPUModelRunner:
                     self._execute_model_generic(
                         token_ids, position_ids, attn_metadata, logits_indices,
                         self.kv_caches, 
-                        inputs_embeds=inputs_embeds, 
+                        inputs_embeds=inputs_embeds,
                         model_mm_kwargs=model_mm_kwargs,
                         warmup_mode=warmup_mode)
                 htorch.core.mark_step()
