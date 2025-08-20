@@ -1580,7 +1580,7 @@ class HPUModelRunner:
         index = positions.to(torch.int64)[:num_decodes]
         padded_index[:num_decodes] = index
 
-        input_mrope_positions: list[list[int]] = [[] for _ in range(3)]
+        input_mrope_positions_list: list[list[int]] = [[] for _ in range(3)]
         if self.uses_mrope:
             for idx, req_id in enumerate(
                     self.input_batch.req_ids[:num_decodes]):
@@ -1596,10 +1596,10 @@ class HPUModelRunner:
                 else:
                     pos_for_mrope = [[position]] * 3
                 for idx in range(3):
-                    input_mrope_positions[idx].extend(pos_for_mrope[idx])
+                    input_mrope_positions_list[idx].extend(pos_for_mrope[idx])
 
             input_mrope_positions = torch.tensor(
-                input_mrope_positions,
+                input_mrope_positions_list,
                 dtype=torch.int32,
                 device='cpu').to('hpu', non_blocking=True)
 

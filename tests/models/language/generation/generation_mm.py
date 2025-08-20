@@ -14,16 +14,17 @@ logger = init_logger()
 
 @dataclass
 class PROMPT_DATA:
-    _questions = {"image": [
-                "What is the most prominent object in this image?",
-                "Describe the scene in the image.",
-                "What is the weather like in the image?",
-                "Write a short poem about this image."
-                ],
-                "video": [
-                    "Describe this video",
-                    "Which movie would you associate this video with?"
-                ]
+    _questions = {
+        "image": [
+            "What is the most prominent object in this image?",
+            "Describe the scene in the image.",
+            "What is the weather like in the image?",
+            "Write a short poem about this image."
+        ],
+        "video": [
+            "Describe this video",
+            "Which movie would you associate this video with?"
+        ]
     }
 
     _data = {
@@ -47,8 +48,7 @@ class PROMPT_DATA:
                     modality: str = "image",
                     media_source: str = "default",
                     num_prompts: int = 1,
-                    skip_vision_data=False
-                    ) -> Union[dict, list[dict]]:
+                    skip_vision_data=False):
         if modality == "image":
             pholder = "<|image_pad|>"
         elif modality == "video":
@@ -85,12 +85,8 @@ class PROMPT_DATA:
         return inputs
 
 
-def run_model(
-            model_name: str,
-            inputs: Union[dict, list[dict]],
-            modality: str,
-            **extra_engine_args
-            ):
+def run_model(model_name: str, inputs: Union[dict, list[dict]], modality: str,
+              **extra_engine_args):
     # Default mm_processor_kwargs
     # mm_processor_kwargs={
     #    "min_pixels": 28 * 28,
@@ -102,9 +98,8 @@ def run_model(
     passed_mm_processor_kwargs.setdefault("min_pixels", 28 * 28)
     passed_mm_processor_kwargs.setdefault("max_pixels", 1280 * 28 * 28)
     passed_mm_processor_kwargs.setdefault("fps", 1)
-    extra_engine_args.update({
-        "mm_processor_kwargs": passed_mm_processor_kwargs
-    })
+    extra_engine_args.update(
+        {"mm_processor_kwargs": passed_mm_processor_kwargs})
 
     extra_engine_args.setdefault("max_model_len", 32768)
     extra_engine_args.setdefault("max_num_seqs", 5)
@@ -146,29 +141,32 @@ def start_test(model_card_path: str):
             num_prompts = input_data_config.get("num_prompts", 1)
             media_source = input_data_config.get("media_source", "default")
 
-            logger.info("================================================\n"
-                        "Running test with configs:\n"
-                        "modality: %(modality)s\n"
-                        "input_data_config: %(input_data_config)s\n"
-                        "extra_engine_args: %(extra_engine_args)s\n"
-                        "================================================",
-                        dict(
-                            modality=modality,
-                            input_data_config=input_data_config,
-                            extra_engine_args=extra_engine_args
-                        ))
+            logger.info(
+                "================================================\n"
+                "Running test with configs:\n"
+                "modality: %(modality)s\n"
+                "input_data_config: %(input_data_config)s\n"
+                "extra_engine_args: %(extra_engine_args)s\n"
+                "================================================",
+                dict(
+                    modality=modality,
+                    input_data_config=input_data_config,
+                    extra_engine_args=extra_engine_args
+                )
+            )
 
             data = PROMPT_DATA()
             inputs = data.get_prompts(modality=modality,
                                       media_source=media_source,
                                       num_prompts=num_prompts)
 
-            logger.info("*** Questions for modality %(modality)s:"
-                        " %(questions)s",
-                        dict(
-                            modality=modality,
-                            questions=data._questions[modality]
-                        ))
+            logger.info(
+                "*** Questions for modality %(modality)s: %(questions)s",
+                dict(
+                    modality=modality,
+                    questions=data._questions[modality]
+                )
+            )
             responses = run_model(model_name, inputs, modality,
                                   **extra_engine_args)
             for response in responses:
@@ -176,10 +174,8 @@ def start_test(model_card_path: str):
                 print("=" * 80)
         except Exception as e:
             logger.error("Error during test with modality %(modality)s: %(e)s",
-                         dict(
-                             modality=modality,
-                             e=e
-                         ))
+                         dict(modality=modality, e=e))
+
             raise
 
 
