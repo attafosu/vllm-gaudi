@@ -421,7 +421,7 @@ class HpuModelAdapter(torch.nn.Module):
             attn_metadata = self._set_block_mapping(attn_metadata, batch_size,
                                                     device, dtype)
         return attn_metadata
-                
+
     def forward(self, *args, **kwargs):
         # TODO(kzawora): something goes VERY WRONG when operating on
         # kwargs['attn_metadata'].slot_mapping, compared to untrimmed metadata
@@ -439,7 +439,7 @@ class HpuModelAdapter(torch.nn.Module):
         attn_meta = kwargs.pop('attn_metadata')
         if 'kv_caches' in kwargs:
             kwargs.pop('kv_caches')
-        
+
         # If multimodal inputs, update kwargs
         model_mm_kwargs = kwargs.pop('model_mm_kwargs', None)
         if model_mm_kwargs is not None:
@@ -453,9 +453,7 @@ class HpuModelAdapter(torch.nn.Module):
 
     def get_input_embeddings(self, input_ids, multimodal_embeddings=None):
         return self.model.get_input_embeddings(
-                            input_ids=input_ids,
-                            multimodal_embeddings=multimodal_embeddings
-                        )
+            input_ids=input_ids, multimodal_embeddings=multimodal_embeddings)
 
     def get_multimodal_embeddings(self, **batched_mm_inputs):
         return self.model.get_multimodal_embeddings(**batched_mm_inputs)
@@ -982,10 +980,9 @@ class HPUModelRunner:
                 return mm_kwargs_combined
 
         return {}
-        
+
     # source: vllm/v1/worker/gpu_model_runner.py
-    def _execute_mm_encoder(self, 
-                            scheduler_output: "SchedulerOutput",
+    def _execute_mm_encoder(self, scheduler_output: "SchedulerOutput",
                             req_ids: list[str]):
         scheduled_encoder_inputs = scheduler_output.scheduled_encoder_inputs
         if not scheduled_encoder_inputs:
@@ -1064,7 +1061,7 @@ class HPUModelRunner:
     def _gather_mm_embeddings(
         self,
         scheduler_output: "SchedulerOutput",
-        req_ids : list[str],
+        req_ids: list[str],
         shift_computed_tokens: int = 0,
     ) -> list[torch.Tensor]:
         mm_embeds: list[torch.Tensor] = []
@@ -1251,8 +1248,7 @@ class HPUModelRunner:
         data = pad_list(data, target_bs, itertools.repeat(padding))
         return data
 
-    def _align_and_pad_mrope_positions(self,
-                                       req_ids: list[str],
+    def _align_and_pad_mrope_positions(self, req_ids: list[str],
                                        context_lens: list[int],
                                        query_lens: list[int],
                                        bucketing: tuple[int, int],
@@ -1261,11 +1257,10 @@ class HPUModelRunner:
         out_shape = (3, target_len) if target_bs == 1 \
             else (target_bs, target_len)
 
-        mrope_position_tensor = torch.full(
-                                    out_shape,
-                                    padding_gen,
-                                    dtype=torch.int32,
-                                    device='hpu')
+        mrope_position_tensor = torch.full(out_shape,
+                                           padding_gen,
+                                           dtype=torch.int32,
+                                           device='hpu')
         dst_start = 0
         dst_end = dst_start
         for b_idx, req_id in enumerate(req_ids):
@@ -1275,8 +1270,7 @@ class HPUModelRunner:
                 self.requests[req_id].mrope_positions[:, cl:cl+qsl]
             dst_end = dst_start + qsl
             mrope_position_tensor[:, dst_start:dst_end].copy_(
-                                            input_mrope_position,
-                                            non_blocking=True)
+                input_mrope_position, non_blocking=True)
 
             # Update dst_start depending on if pos_ids of requests are meant to be adjacent # noqa 501
             if target_bs == 1:
@@ -1432,11 +1426,11 @@ class HPUModelRunner:
         # and pad the M-RoPE positions for the scheduled prefill tokens
         if self.uses_mrope:
             mrope_token_positions = self._align_and_pad_mrope_positions(
-                    contents.req_ids,
-                    context_lens,
-                    query_lens,
-                    (target_bs, target_seq),
-                    -1,
+                contents.req_ids,
+                context_lens,
+                query_lens,
+                (target_bs, target_seq),
+                -1,
             )
 
         # NOTE: If model does not support multimodal inputs, we pad here.
@@ -1598,13 +1592,14 @@ class HPUModelRunner:
                 for idx in range(3):
                     input_mrope_positions_list[idx].extend(pos_for_mrope[idx])
 
-            input_mrope_positions = torch.tensor(
-                input_mrope_positions_list,
-                dtype=torch.int32,
-                device='cpu').to('hpu', non_blocking=True)
+            input_mrope_positions = torch.tensor(input_mrope_positions_list,
+                                                 dtype=torch.int32,
+                                                 device='cpu').to(
+                                                     'hpu', non_blocking=True)
 
             # Pad the right side of input_mrope_positions by padded_batch_size
-            pad_size = padded_batch_size - input_mrope_positions.size(1) # noqa
+            pad_size = padded_batch_size - input_mrope_positions.size(
+                1)  # noqa
             if pad_size > 0:
                 input_mrope_positions = F.pad(input_mrope_positions,
                                               (0, pad_size),
@@ -1772,8 +1767,7 @@ class HPUModelRunner:
                 attn_metadata=trimmed_attn_metadata,
                 kv_caches=kv_caches,
                 inputs_embeds=inputs_embeds,
-                model_mm_kwargs=model_mm_kwargs
-            )
+                model_mm_kwargs=model_mm_kwargs)
         # NOTE(kzawora): returning hidden_states is required in prompt logprobs
         # scenarios, as they will do logit processing on their own
         non_flattened_hidden_states = hidden_states
@@ -2043,8 +2037,7 @@ class HPUModelRunner:
                 if self.supports_mm_inputs:
                     # Run the multimodal encoder if any.
                     with self.profiler.record_event('internal',
-                                                    'prepare_input_encoders'
-                                                    ):
+                                                    'prepare_input_encoders'):
                         self._execute_mm_encoder(scheduler_output, req_id)
 
                     mm_embeds = self._gather_mm_embeddings(
@@ -2059,9 +2052,9 @@ class HPUModelRunner:
 
                     model_mm_kwargs = self._extract_mm_kwargs(scheduler_output)
                     model_mm_kwargs = MultiModalKwargs.as_kwargs(
-                            model_mm_kwargs,
-                            device=self.device,
-                        )
+                        model_mm_kwargs,
+                        device=self.device,
+                    )
 
                 self.event_start = self.profiler.get_timestamp_us()
                 self.profiler.start("internal", "prefill")
@@ -2077,7 +2070,7 @@ class HPUModelRunner:
                 prefill_hidden_states_ts, logits_device = \
                     self._execute_model_generic(
                         token_ids, position_ids, attn_metadata, logits_indices,
-                        self.kv_caches, 
+                        self.kv_caches,
                         inputs_embeds=inputs_embeds,
                         model_mm_kwargs=model_mm_kwargs,
                         warmup_mode=warmup_mode)
@@ -2514,7 +2507,7 @@ class HPUModelRunner:
         htorch.core.mark_step()
         self.profiler.end()
         return None
-      
+
     def log_warmup(self, phase, i, max_i, batch_size, seq_len, num_blocks):
         free_mem = format_bytes(
             HabanaMemoryProfiler.current_free_device_memory())
